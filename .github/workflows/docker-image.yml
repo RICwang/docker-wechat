@@ -32,9 +32,10 @@ jobs:
         NEW_VERSION=$(docker run --rm temp-image cat /etc/cont-env.d/APP_VERSION)
         echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
         
+        FULL_IMAGE_NAME="${{ secrets.DOCKER_REPOSITORY }}/${{ secrets.DOCKER_IMAGE_NAME }}"
         # 尝试拉取最新镜像获取旧版本号
-        if docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest 2>/dev/null; then
-          OLD_VERSION=$(docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest cat /etc/cont-env.d/APP_VERSION)
+        if docker pull $FULL_IMAGE_NAME:latest 2>/dev/null; then
+          OLD_VERSION=$(docker run --rm $FULL_IMAGE_NAME:latest cat /etc/cont-env.d/APP_VERSION)
         else
           OLD_VERSION="none"
         fi
