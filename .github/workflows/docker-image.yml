@@ -1,6 +1,8 @@
 name: docker-wechat CI
-
 on:
+  schedule:
+    - cron: '0 9 * * *'  # 每小时执行
+  workflow_dispatch:      # 允许手动触发
   push:
     branches: [ "main" ]
 
