@@ -38,6 +38,7 @@ services:
     ports:
       - "5800:5800"
       - "5900:5900"
+    hostname: wechat
     environment:
       - LANG=zh_CN.UTF-8
       - USER_ID=0
@@ -51,6 +52,7 @@ services:
 ```
 docker run -d \
  --name wechat_container_demo \
+ --hostname wechat \
  -v <THE PATH>/.xwechat:/root/.xwechat \
  -v <THE PATH>/xwechat_files:/root/xwechat_files \
  -v <THE PATH>/downloads:/root/downloads \
