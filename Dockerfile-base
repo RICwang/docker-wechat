@@ -5,8 +5,11 @@ RUN sed -i 's@/archive.ubuntu.com/@/mirrors.tuna.tsinghua.edu.cn/@g' /etc/apt/so
     && sed -i 's@/security.ubuntu.com/@/mirrors.tuna.tsinghua.edu.cn/ubuntu/@g' /etc/apt/sources.list.d/ubuntu.sources
 
 # 安装必要依赖
+# 注意：基础镜像已预创建 /var/log，而 language-pack-zh-hans 等包会间接拉入 systemd，
+# systemd 的 postinst 脚本执行 mkdir /var/log（不带 -p）会失败。
+# 因此先尝试正常安装，失败后 patch postinst 并重试。
 RUN apt update && \
-    apt install -y language-pack-zh-hans fonts-noto-cjk-extra curl \
+    (apt install -y language-pack-zh-hans fonts-noto-cjk-extra curl \
     shared-mime-info desktop-file-utils libxcb1 libxcb-icccm4 libxcb-image0 \
     libxcb-keysyms1 libxcb-randr0 libxcb-render0 libxcb-render-util0 libxcb-shape0 \
     libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xkb1 libxcb-xinerama0 \
@@ -15,7 +18,10 @@ RUN apt update && \
     libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 \
     libxcomposite1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
     libxss1 libxtst6 libatomic1 libxcomposite1 libxrender1 libxrandr2 libxkbcommon-x11-0 \
-    libfontconfig1 libdbus-1-3 libnss3 libx11-xcb1 libasound2t64 libpulse0 && \
+    libfontconfig1 libdbus-1-3 libnss3 libx11-xcb1 libasound2t64 libpulse0 || \
+    (sed -i 's|^mkdir /var/log$|mkdir -p /var/log|' /var/lib/dpkg/info/systemd.postinst && \
+     dpkg --configure -a && \
+     apt install -y -f)) && \
     # 清理工作
     apt clean && \
     rm -rf /var/lib/apt/lists/*
