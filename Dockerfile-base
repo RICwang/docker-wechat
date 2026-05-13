@@ -15,7 +15,7 @@ RUN apt update && \
     libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 \
     libxcomposite1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
     libxss1 libxtst6 libatomic1 libxcomposite1 libxrender1 libxrandr2 libxkbcommon-x11-0 \
-    libfontconfig1 libdbus-1-3 libnss3 libx11-xcb1 libasound2t64 && \
+    libfontconfig1 libdbus-1-3 libnss3 libx11-xcb1 libasound2t64 libpulse0 && \
     # 清理工作
     apt clean && \
     rm -rf /var/lib/apt/lists/*
@@ -25,4 +25,5 @@ RUN APP_ICON_URL=https://res.wx.qq.com/a/wx_fed/assets/res/NTI4MWU5.ico && \
     install_app_icon.sh "$APP_ICON_URL"
     
 # 设置应用名称
-RUN set-cont-env APP_NAME "Wechat"
+RUN set-cont-env APP_NAME "Wechat" && \
+    chmod -x /etc/cont-env.d/APP_NAME

@@ -1,6 +1,9 @@
 # docker-wechat
 在docker里运行wechat，可以通过web或者VNC访问wechat
 
+# 平台支持
+镜像构建支持 `linux/amd64` 和 `linux/arm64`。构建时会从[微信 Linux 版官网](https://linux.weixin.qq.com/)解析当前架构对应的最新 deb 下载链接。官网同时提供 LoongArch deb，但当前使用的 GUI base image 暂无 LoongArch 平台镜像，因此暂不发布 LoongArch 镜像。
+
 # 环境变量
 | 环境变量       | 描述                                  | 默认值 |
 |----------------|----------------------------------------------|---------|

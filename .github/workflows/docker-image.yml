@@ -3,8 +3,24 @@ on:
   schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
+    inputs:
+      rebuild_base:
+        description: Rebuild and push the base image
+        required: false
+        type: boolean
+        default: false
+      force_push:
+        description: Push the app image even if the WeChat version is unchanged
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [ "main" ]
+    paths:
+      - "Dockerfile"
+      - "Dockerfile-base"
+      - "scripts/**"
+      - ".github/workflows/docker-image.yml"
 
 jobs:
   build:
@@ -12,49 +28,111 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      FULL_IMAGE_NAME: ${{ secrets.DOCKER_REPOSITORY }}/${{ secrets.DOCKER_IMAGE_NAME }}
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v5
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
 
     - name: Log in to Docker Hub
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-        
-    - name: Build image
+
+    - name: Decide base rebuild
+      id: base
+      env:
+        REBUILD_BASE: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.rebuild_base) }}
       run: |
-        docker build --no-cache -t temp-image .
-        
-    - name: Extract version
+        if [ "$REBUILD_BASE" = "true" ]; then
+          echo "rebuild=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "rebuild=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Build and push base image
+      if: steps.base.outputs.rebuild == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: ./Dockerfile-base
+        platforms: linux/amd64,linux/arm64
+        pull: true
+        no-cache: true
+        push: true
+        tags: ${{ env.FULL_IMAGE_NAME }}:base
+
+    - name: Extract WeChat version
       id: version
       run: |
-        # 从新构建的镜像中提取版本号
-        NEW_VERSION=$(docker run --rm temp-image cat /etc/cont-env.d/APP_VERSION)
-        echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-        
-        FULL_IMAGE_NAME="${{ secrets.DOCKER_REPOSITORY }}/${{ secrets.DOCKER_IMAGE_NAME }}"
-        # 尝试拉取最新镜像获取旧版本号
-        if docker pull $FULL_IMAGE_NAME:latest 2>/dev/null; then
-          OLD_VERSION=$(docker run --rm $FULL_IMAGE_NAME:latest cat /etc/cont-env.d/APP_VERSION)
+        WECHAT_URL="$(scripts/resolve-wechat-download.sh amd64)"
+        curl --fail --location --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 \
+          --output /tmp/WeChatLinux.deb "$WECHAT_URL"
+        NEW_VERSION="$(dpkg-deb -f /tmp/WeChatLinux.deb Version)"
+        echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "download_url=${WECHAT_URL}" >> "$GITHUB_OUTPUT"
+
+        if docker pull "$FULL_IMAGE_NAME:latest" 2>/dev/null; then
+          OLD_VERSION="$(docker run --rm --platform linux/amd64 "$FULL_IMAGE_NAME:latest" cat /etc/cont-env.d/APP_VERSION)"
         else
           OLD_VERSION="none"
         fi
-        echo "old_version=${OLD_VERSION}" >> $GITHUB_OUTPUT
-        
-    - name: Push image if version changed
-      if: steps.version.outputs.new_version != steps.version.outputs.old_version
+        echo "old_version=${OLD_VERSION}" >> "$GITHUB_OUTPUT"
+
+    - name: Decide app image push
+      id: publish
+      env:
+        NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        OLD_VERSION: ${{ steps.version.outputs.old_version }}
+        BASE_REBUILT: ${{ steps.base.outputs.rebuild }}
+        FORCE_PUSH: ${{ github.event_name == 'workflow_dispatch' && inputs.force_push }}
       run: |
-        VERSION="${{ steps.version.outputs.new_version }}"
-        FULL_IMAGE_NAME="${{ secrets.DOCKER_REPOSITORY }}/${{ secrets.DOCKER_IMAGE_NAME }}"
-        
-        # 标记镜像
-        docker tag temp-image $FULL_IMAGE_NAME:$VERSION
-        docker tag temp-image $FULL_IMAGE_NAME:latest
-        
-        # 推送镜像
-        docker push $FULL_IMAGE_NAME:$VERSION
-        docker push $FULL_IMAGE_NAME:latest
-        
-        echo "Successfully pushed new version: $VERSION"
+        SHOULD_PUSH=false
+        REASON="version unchanged"
+
+        if [ "$NEW_VERSION" != "$OLD_VERSION" ]; then
+          SHOULD_PUSH=true
+          REASON="new WeChat version: $OLD_VERSION -> $NEW_VERSION"
+        elif [ "$BASE_REBUILT" = "true" ]; then
+          SHOULD_PUSH=true
+          REASON="base image rebuilt"
+        elif [ "$FORCE_PUSH" = "true" ]; then
+          SHOULD_PUSH=true
+          REASON="manual force push"
+        fi
+
+        echo "should_push=${SHOULD_PUSH}" >> "$GITHUB_OUTPUT"
+        echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
+        echo "$REASON"
+
+    - name: Build and push app image
+      if: steps.publish.outputs.should_push == 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/amd64,linux/arm64
+        pull: true
+        no-cache: true
+        push: true
+        build-args: |
+          BASE_IMAGE=${{ env.FULL_IMAGE_NAME }}:base
+        tags: |
+          ${{ env.FULL_IMAGE_NAME }}:${{ steps.version.outputs.new_version }}
+          ${{ env.FULL_IMAGE_NAME }}:latest
+        labels: |
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.version=${{ steps.version.outputs.new_version }}
+
+    - name: Skip image push
+      if: steps.publish.outputs.should_push != 'true'
+      run: |
+        echo "Skipping push: ${{ steps.publish.outputs.reason }}"
