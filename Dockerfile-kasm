@@ -12,9 +12,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 COPY scripts/resolve-wechat-download.sh /usr/local/bin/resolve-wechat-download
 RUN chmod +x /usr/local/bin/resolve-wechat-download
 
+# The KasmVNC base already carries many GUI packages. Avoid upgrading those
+# base packages in this derived image, or the app layer grows sharply.
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends \
+    apt-get install -y --no-install-recommends --no-upgrade \
         ca-certificates \
         curl \
         desktop-file-utils \
@@ -67,17 +69,14 @@ RUN set -eux; \
         libxcb-xinerama0 \
         libxcb-xkb1 \
         libxcb1 \
-        locales \
         shared-mime-info; \
-    sed -i 's/^# *zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen; \
-    locale-gen zh_CN.UTF-8; \
     WECHAT_DEB_URL="$(resolve-wechat-download "${TARGETARCH:-}" "$WECHAT_DOWNLOAD_PAGE")"; \
     curl --fail --location \
         --retry 8 --retry-delay 15 --retry-all-errors \
         --connect-timeout 30 --max-time 300 --speed-time 60 --speed-limit 1024 \
         --output /tmp/WeChatLinux.deb "$WECHAT_DEB_URL"; \
     APP_VERSION="$(dpkg-deb -f /tmp/WeChatLinux.deb Version)"; \
-    apt-get install -y --no-install-recommends /tmp/WeChatLinux.deb; \
+    apt-get install -y --no-install-recommends --no-upgrade /tmp/WeChatLinux.deb; \
     printf '%s\n' "$APP_VERSION" > /etc/wechat-version; \
     rm -f /tmp/WeChatLinux.deb; \
     apt-get clean; \
