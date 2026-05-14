@@ -1,0 +1,21 @@
+services:
+  wechat:
+    build:
+      context: .
+      dockerfile: Dockerfile-kasm
+    image: ricwang/docker-wechat:Kasm-latest
+    container_name: wechat_kasm
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      - LC_ALL=zh_CN.UTF-8
+      - TITLE=WeChat
+      - START_DOCKER=false
+      # - CUSTOM_USER=abc
+      # - PASSWORD=abc
+    volumes:
+      - ./data/kasm-config:/config
+    shm_size: "1gb"
+    security_opt:
+      - seccomp=unconfined

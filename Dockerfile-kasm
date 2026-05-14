@@ -1,0 +1,87 @@
+FROM ghcr.io/linuxserver/baseimage-kasmvnc:ubuntunoble
+
+ARG TARGETARCH
+ARG WECHAT_DOWNLOAD_PAGE="https://linux.weixin.qq.com/"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=zh_CN.UTF-8 \
+    LC_ALL=zh_CN.UTF-8 \
+    TITLE=WeChat \
+    START_DOCKER=false
+
+COPY scripts/resolve-wechat-download.sh /usr/local/bin/resolve-wechat-download
+RUN chmod +x /usr/local/bin/resolve-wechat-download
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        desktop-file-utils \
+        fonts-noto-cjk \
+        fonts-noto-color-emoji \
+        libasound2t64 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libatomic1 \
+        libc6 \
+        libcairo2 \
+        libcups2 \
+        libdbus-1-3 \
+        libfontconfig1 \
+        libgbm1 \
+        libgcc-s1 \
+        libgdk-pixbuf2.0-0 \
+        libglib2.0-0 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libpulse0 \
+        libstdc++6 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxext6 \
+        libxfixes3 \
+        libxi6 \
+        libxkbcommon-x11-0 \
+        libxrandr2 \
+        libxrender1 \
+        libxss1 \
+        libxtst6 \
+        libxcb-glx0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-render0 \
+        libxcb-shape0 \
+        libxcb-shm0 \
+        libxcb-sync1 \
+        libxcb-util1 \
+        libxcb-xfixes0 \
+        libxcb-xinerama0 \
+        libxcb-xkb1 \
+        libxcb1 \
+        locales \
+        shared-mime-info; \
+    sed -i 's/^# *zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen; \
+    locale-gen zh_CN.UTF-8; \
+    WECHAT_DEB_URL="$(resolve-wechat-download "${TARGETARCH:-}" "$WECHAT_DOWNLOAD_PAGE")"; \
+    curl --fail --location \
+        --retry 8 --retry-delay 15 --retry-all-errors \
+        --connect-timeout 30 --max-time 300 --speed-time 60 --speed-limit 1024 \
+        --output /tmp/WeChatLinux.deb "$WECHAT_DEB_URL"; \
+    APP_VERSION="$(dpkg-deb -f /tmp/WeChatLinux.deb Version)"; \
+    apt-get install -y --no-install-recommends /tmp/WeChatLinux.deb; \
+    printf '%s\n' "$APP_VERSION" > /etc/wechat-version; \
+    rm -f /tmp/WeChatLinux.deb; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
+
+COPY kasm-root/ /
+RUN chmod +x /usr/local/bin/start-wechat-kasm

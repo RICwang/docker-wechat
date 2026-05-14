@@ -4,6 +4,37 @@
 # 平台支持
 镜像构建支持 `linux/amd64` 和 `linux/arm64`。构建时会从[微信 Linux 版官网](https://linux.weixin.qq.com/)解析当前架构对应的最新 deb 下载链接。官网同时提供 LoongArch deb，但当前使用的 GUI base image 暂无 LoongArch 平台镜像，因此暂不发布 LoongArch 镜像。
 
+# 方案选择
+默认镜像继续使用 `jlesage/baseimage-gui`，保持现有 `5800/5900` 端口、数据目录和启动方式不变。更好的中文输入体验放在独立的 KasmVNC 试验方案中：
+
+| 方案 | 技术 | 端口 | 中文输入 | 状态 |
+|------|------|------|----------|------|
+| `Dockerfile` | jlesage/baseimage-gui, TigerVNC + noVNC | 5800/5900 | 保持原有 noVNC/VNC 行为 | 稳定默认 |
+| `Dockerfile-kasm` | linuxserver/baseimage-kasmvnc, KasmVNC + Kclient | 3000/3001 | Web 设置中开启 IME Input Mode，优先用本机输入法 | 推荐试验 |
+
+# 中文输入
+默认 `jlesage` 镜像保持原有输入链路，不额外引入容器内输入法。通过浏览器访问 Web GUI 时，中文输入效果取决于 noVNC、浏览器和客户端系统输入法的兼容性；复制粘贴仍可作为兜底输入方式。
+
+KasmVNC 试验镜像不依赖容器内输入法，访问 `http://localhost:3000` 或 `https://localhost:3001` 后，在 KasmVNC 左侧面板的 Settings 中开启 `IME Input Mode`，再使用宿主机输入法输入中文。
+
+# KasmVNC 试验镜像
+本仓库提供 `Dockerfile-kasm` 和 `compose.kasm.yml` 用于试验 KasmVNC 方案：
+
+```
+docker compose -f compose.kasm.yml up --build
+```
+
+访问：
+
+```
+http://localhost:3000
+https://localhost:3001
+```
+
+KasmVNC 方案使用 `/config` 保存数据。示例 compose 会把数据持久化到 `./data/kasm-config`，微信数据位于该目录下的 `.xwechat`、`xwechat_files` 和 `downloads`。
+
+推送或合并提交到 `kasm` 分支时，GitHub Actions 会自动构建 `Dockerfile-kasm` 并推送到 Docker Hub。KasmVNC 镜像 tag 使用 `Kasm` 前缀，例如 `Kasm-latest`、`Kasm-<微信版本>` 和 `Kasm-<微信版本>-<短提交号>`。
+
 # 环境变量
 | 环境变量       | 描述                                  | 默认值 |
 |----------------|----------------------------------------------|---------|

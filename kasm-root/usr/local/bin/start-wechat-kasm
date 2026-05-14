@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+export HOME="${HOME:-/config}"
+export LANG="${LANG:-zh_CN.UTF-8}"
+export LC_ALL="${LC_ALL:-zh_CN.UTF-8}"
+export QT_X11_NO_MITSHM=1
+
+mkdir -p "$HOME/.xwechat" "$HOME/xwechat_files" "$HOME/downloads"
+
+exec /usr/bin/wechat

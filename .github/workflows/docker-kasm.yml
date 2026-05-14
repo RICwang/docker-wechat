@@ -1,0 +1,61 @@
+name: docker-wechat Kasm CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "kasm" ]
+
+jobs:
+  build-kasm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      FULL_IMAGE_NAME: ${{ secrets.DOCKER_REPOSITORY }}/${{ secrets.DOCKER_IMAGE_NAME }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v4
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract Kasm WeChat version
+      id: kasm_version
+      run: |
+        WECHAT_URL="$(scripts/resolve-wechat-download.sh amd64)"
+        curl --fail --location --retry 5 --retry-delay 10 --retry-all-errors --connect-timeout 30 \
+          --output /tmp/WeChatLinux.deb "$WECHAT_URL"
+        WECHAT_VERSION="$(dpkg-deb -f /tmp/WeChatLinux.deb Version)"
+        SHORT_SHA="${GITHUB_SHA::7}"
+        echo "wechat_version=${WECHAT_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "image_version=Kasm-${WECHAT_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+        echo "download_url=${WECHAT_URL}" >> "$GITHUB_OUTPUT"
+
+    - name: Build and push Kasm image
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: ./Dockerfile-kasm
+        platforms: linux/amd64,linux/arm64
+        pull: true
+        no-cache: true
+        push: true
+        tags: |
+          ${{ env.FULL_IMAGE_NAME }}:Kasm-latest
+          ${{ env.FULL_IMAGE_NAME }}:${{ steps.kasm_version.outputs.image_version }}
+          ${{ env.FULL_IMAGE_NAME }}:${{ steps.kasm_version.outputs.image_version }}-${{ steps.kasm_version.outputs.short_sha }}
+        labels: |
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.version=${{ steps.kasm_version.outputs.image_version }}

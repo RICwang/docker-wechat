@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="MENU">
+    <item label="WeChat">
+      <action name="Execute">
+        <command>/usr/local/bin/start-wechat-kasm</command>
+      </action>
+    </item>
+  </menu>
+</openbox_menu>
