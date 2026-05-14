@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+
+mkdir -p /tmp/.X11-unix
+chmod 1777 /tmp/.X11-unix

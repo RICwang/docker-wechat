@@ -83,4 +83,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 COPY kasm-root/ /
-RUN chmod +x /usr/local/bin/start-wechat-kasm
+RUN chmod +x \
+        /custom-cont-init.d/10-x11-unix \
+        /defaults/startwm.sh \
+        /usr/local/bin/start-wechat-kasm
