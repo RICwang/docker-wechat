@@ -69,7 +69,7 @@ docker run -d \
 ```
 
 # 演示：
-https://b23.tv/ihPZQaa  
+https://www.bilibili.com/video/BV1CszKYbEji
 https://youtu.be/1zqcNArcZBA
 
 # Stars 🌟
